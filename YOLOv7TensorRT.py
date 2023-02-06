@@ -86,7 +86,11 @@ class BaseEngine(object):
         origin_img = cv2.cvtColor(origin_img, cv2.COLOR_BGR2RGB)
         img, ratio = preproc(origin_img, self.imgsz, self.mean, self.std)
         num, final_boxes, final_scores, final_cls_inds = self.infer(img)
-        final_boxes = np.reshape(final_boxes, (-1, 4))
+        # num: number of object detected
+        # final_boxes: Coordinates of the bounding boxes
+        # final scores: Confidence score of each object
+        # final_cls_inds: The position (index) of class in the list above (80 classes, count start at 0)
+        final_boxes = np.reshape(final_boxes, (-1, 4)) # Unknown number of rows and 4 columns
         num = num[0]
         if num > 0:
             final_boxes, final_scores, final_cls_inds = final_boxes[:num] / ratio, final_scores[:num], final_cls_inds[
