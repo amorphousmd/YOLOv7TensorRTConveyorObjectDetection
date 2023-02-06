@@ -180,6 +180,7 @@ class Logic(QMainWindow, Ui_MainWindow):
 
         while True:
             if self.allowCapture:
+                self.time_start = time.time()
                 ret, frame = self.cam.read()
                 if not ret:
                     print("failed to grab frame")
@@ -187,6 +188,8 @@ class Logic(QMainWindow, Ui_MainWindow):
                 confidence = self.confidence
                 origin_img = pred.direct_inference(frame, conf=confidence)
                 self.set_image(origin_img)
+                self.time_detect = time.time() - self.time_start
+                self.label_4.setText(str(self.time_detect)) # Has to use a label, editbox just freezes the GUI
 
                 k = cv2.waitKey(1)
             else:
