@@ -6,3 +6,13 @@
 dontcommit.py
 
 __pycache__/
+
+*.trt
+
+*.onnx
+
+*.pt
+
+*.ptl
+
+.ipynb_checkpoints/

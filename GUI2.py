@@ -170,13 +170,14 @@ class Logic(QMainWindow, Ui_MainWindow):
         pass
 
     def start_grabbing(self):
-        thread = threading.Thread(target=self.cuda_context)
+        thread = threading.Thread(target=self.cuda_context2)
         thread.start()
 
     def cuda_context(self):
         cuda.init()
         cuda_context = cuda.Device(0).make_context()
         pred = BaseEngineHumans(engine_path='./tensorrt-python/yolov7-tiny-nms.trt')
+
 
         while True:
             if self.allowCapture:
@@ -198,6 +199,32 @@ class Logic(QMainWindow, Ui_MainWindow):
         self.cam.release()
 
         cv2.destroyAllWindows()
+        cuda_context.pop()
+
+    # def cuda_context2(self):
+    #     cuda.init()
+    #     cuda_context = cuda.Device(0).make_context()
+    #     pred = BaseEngineHumans(engine_path='./tensorrt-python/YOLOv7X.trt')
+    #
+    #     options = QFileDialog.Options()
+    #     options |= QFileDialog.ReadOnly
+    #     fileName, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
+    #                                               "All Files (*);;Images (*.png *.xpm *.jpg *.bmp *.gif)",
+    #                                               options=options)
+    #     while True:
+    #         if fileName:
+    #             image = cv2.imread(fileName)
+    #             self.time_start = time.time()
+    #             confidence = self.confidence
+    #             origin_img = pred.direct_inference(image, conf=confidence)
+    #             self.set_image(origin_img)
+    #             self.time_detect = time.time() - self.time_start
+    #             self.label_4.setText(str(self.time_detect))  # Has to use a label, editbox just freezes the GUI
+    #         else:
+    #             break
+
+
+
         cuda_context.pop()
         # en:Stop grab image
 
