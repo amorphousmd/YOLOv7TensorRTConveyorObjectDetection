@@ -16,3 +16,11 @@ __pycache__/
 *.ptl
 
 .ipynb_checkpoints/
+
+seg/runs/predict-seg/
+
+*.engine
+
+TestImages/
+
+*.pth

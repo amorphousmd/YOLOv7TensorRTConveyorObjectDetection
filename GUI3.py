@@ -27,10 +27,10 @@ import numpy as np
 import cv2
 
 from YOLOv7TensorRT import _COLORS
+from seg.segment.inferences import SegmentInference, parse_opt
 from YOLOv7TensorRT import BaseEngine
 import YOLOv7TensorRT as yolov7
 import time
-
 
 class BaseEngineCracker(BaseEngine):
     def __init__(self, engine_path, imgsz=(640, 640)):
@@ -79,7 +79,11 @@ class BaseEngineCracker(BaseEngine):
         origin_img = cv2.cvtColor(origin_img, cv2.COLOR_RGB2BGR)
         return origin_img
 
-pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7X.trt')
+# pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7.trt')
+# opt = parse_opt()
+# opt.nosave = True
+# segment_object = SegmentInference()
+# segment_object.start(**vars(opt))
 
 def coord_list_to_center_list(coord_list, confidence):
     centers = []
@@ -108,7 +112,7 @@ class Logic(QMainWindow, Ui_MainWindow):
         self.btnEnum.clicked.connect(self.enum_devices)
         self.btnOpen.clicked.connect(self.open_device)
         self.btnClose.clicked.connect(self.close_device)
-        self.bnStart.clicked.connect(self.cuda_context2)
+        self.bnStart.clicked.connect(self.cuda_context3)
         self.bnSingle.clicked.connect(self.single_grab)
         self.bnStop.clicked.connect(self.stop_grabbing)
         self.bnSave.clicked.connect(self.saveImage)
@@ -198,8 +202,17 @@ class Logic(QMainWindow, Ui_MainWindow):
         pass
 
     def start_grabbing(self):
+        # Old code (bounding boxes inferences)
         thread = threading.Thread(target=self.cuda_context2)
         thread.start()
+
+        # New code (Segmentation)
+        # segment_object = SegmentInference()
+        # segment_object.start(**vars(opt))
+        # segment_object.infer()
+        # segment_object.getcentermask
+        # segment_object.getcenterbox
+
 
     def cuda_context(self):
         cuda.init()
@@ -228,6 +241,10 @@ class Logic(QMainWindow, Ui_MainWindow):
         cuda_context.pop()
 
     def cuda_context2(self):
+        cuda.init()
+        cuda_context = cuda.Device(0).make_context()
+        pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7.trt')
+
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
 
@@ -237,6 +254,7 @@ class Logic(QMainWindow, Ui_MainWindow):
                                                       options=options)
             if fileName:
                 image = cv2.imread(fileName)
+                # image = cv2.resize(image, (640, 640))
                 self.time_start = time.time()
                 confidence = self.confidence
                 origin_img = pred.direct_inference(image, conf=confidence)
@@ -244,13 +262,38 @@ class Logic(QMainWindow, Ui_MainWindow):
                 for center in center_list:
                     center = (int(center[0]), int(center[1]))
                     origin_img = cv2.circle(origin_img, center, radius=10, color=(0, 0, 255), thickness=-1)
-
                 self.set_image(origin_img)
                 self.time_detect = time.time() - self.time_start
                 self.label_4.setText(str(self.time_detect))  # Has to use a label, editbox just freezes the GUI
             else:
                 break
+        cuda_context.pop()
         # en:Stop grab image
+
+    def cuda_context3(self):
+        cuda.init()
+        cuda_context = cuda.Device(0).make_context()
+        opt = parse_opt()
+        opt.nosave = True
+        segment_object = SegmentInference()
+        segment_object.start(**vars(opt))
+        options = QFileDialog.Options()
+        options |= QFileDialog.ReadOnly
+
+        while True:
+            fileName, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
+                                                      "All Files (*);;Images (*.png *.xpm *.jpg *.bmp *.gif)",
+                                                      options=options)
+            if fileName:
+                opt.source = fileName
+                self.time_start = time.time()
+                segment_object.infer(**vars(opt))
+                self.time_detect = time.time() - self.time_start
+                self.set_image(segment_object.get_inferred_image_with_MaskCentroid())
+                self.label_4.setText(str(self.time_detect))  # Has to use a label, editbox just freezes the GUI
+            else:
+                break
+        cuda_context.pop()
 
     def stop_grabbing(self):
         pass
@@ -275,8 +318,6 @@ class Logic(QMainWindow, Ui_MainWindow):
     def set_param(self):
         pass
 
-
-
     def get_image(self):
         pass
 
@@ -294,7 +335,7 @@ class Logic(QMainWindow, Ui_MainWindow):
                     to set at the label.
                 """
         self.tmp = image
-        image = imutils.resize(image, width=1000)
+        image = cv2.resize(image, (1000, 750))
         frame = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = QImage(frame, frame.shape[1], frame.shape[0], frame.strides[0], QImage.Format_RGB888)
         self.displayLabel.setPixmap(QtGui.QPixmap.fromImage(image))
