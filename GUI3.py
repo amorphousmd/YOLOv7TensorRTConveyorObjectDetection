@@ -99,6 +99,7 @@ def coord_list_to_center_list(coord_list, confidence):
 class Logic(QMainWindow, Ui_MainWindow):
     def overwriteLogic(self):
         self.model_name = 'solov2'  # Default model
+        self.model = 0 # Default model index
         self.run = False
         self.Timer = QTimer()
         self.Timer.timeout.connect(self.trigger_once)
@@ -109,10 +110,13 @@ class Logic(QMainWindow, Ui_MainWindow):
         self.allowCapture = True
         self.confidence = 0.5
         # self.cam = cv2.VideoCapture(0)
+        self.comboModels.setItemText(0, "YOLOv7")
+        self.comboModels.setItemText(1, 'YOLOv7Segmentation')
+        self.comboModels.setItemText(2, 'YOLOv7Tiny')
         self.btnEnum.clicked.connect(self.enum_devices)
         self.btnOpen.clicked.connect(self.open_device)
         self.btnClose.clicked.connect(self.close_device)
-        self.bnStart.clicked.connect(self.cuda_context3)
+        self.bnStart.clicked.connect(self.start_grabbing)
         self.bnSingle.clicked.connect(self.single_grab)
         self.bnStop.clicked.connect(self.stop_grabbing)
         self.bnSave.clicked.connect(self.saveImage)
@@ -181,7 +185,15 @@ class Logic(QMainWindow, Ui_MainWindow):
         pass
 
     def select_model(self, i):
-        pass
+        if i == 0:
+            self.model = 0
+            print("[MODEL]: YOLOv7")
+        elif i == 1:
+            self.model = 1
+            print("[MODEL]: YOLOv7Segmentation")
+        elif i == 2:
+            self.model = 2
+            print("[MODEL]: YOLOv7Tiny")
 
     def run_model(self):
         print(self.editScoreThreshold.toPlainText())
@@ -203,8 +215,8 @@ class Logic(QMainWindow, Ui_MainWindow):
 
     def start_grabbing(self):
         # Old code (bounding boxes inferences)
-        thread = threading.Thread(target=self.cuda_context2)
-        thread.start()
+        # thread = threading.Thread(target=self.cuda_context2)
+        # thread.start()
 
         # New code (Segmentation)
         # segment_object = SegmentInference()
@@ -212,35 +224,17 @@ class Logic(QMainWindow, Ui_MainWindow):
         # segment_object.infer()
         # segment_object.getcentermask
         # segment_object.getcenterbox
+        if self.model == 0:
+            self.cuda_contextYOLO()
+        elif self.model == 1:
+            self.cuda_contextYOLOSegmentation()
+        elif self.model == 2:
+            self.cuda_contextYOLOTiny()
+        else:
+            print("Model not implemented yet")
+            return
 
-
-    def cuda_context(self):
-        cuda.init()
-        cuda_context = cuda.Device(0).make_context()
-
-        while True:
-            if self.allowCapture:
-                self.time_start = time.time()
-                ret, frame = self.cam.read()
-                if not ret:
-                    print("failed to grab frame")
-                    break
-                confidence = self.confidence
-                origin_img = pred.direct_inference(frame, conf=confidence)
-                self.set_image(origin_img)
-                self.time_detect = time.time() - self.time_start
-                self.label_4.setText(str(self.time_detect)) # Has to use a label, editbox just freezes the GUI
-
-                k = cv2.waitKey(1)
-            else:
-                break
-
-        self.cam.release()
-
-        cv2.destroyAllWindows()
-        cuda_context.pop()
-
-    def cuda_context2(self):
+    def cuda_contextYOLO(self):
         cuda.init()
         cuda_context = cuda.Device(0).make_context()
         pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7.trt')
@@ -255,22 +249,56 @@ class Logic(QMainWindow, Ui_MainWindow):
             if fileName:
                 image = cv2.imread(fileName)
                 # image = cv2.resize(image, (640, 640))
-                self.time_start = time.time()
                 confidence = self.confidence
+                self.time_start = time.time()
                 origin_img = pred.direct_inference(image, conf=confidence)
+                self.time_detect = time.time() - self.time_start
                 center_list = coord_list_to_center_list(pred.coord_list, self.confidence)
                 for center in center_list:
                     center = (int(center[0]), int(center[1]))
                     origin_img = cv2.circle(origin_img, center, radius=10, color=(0, 0, 255), thickness=-1)
                 self.set_image(origin_img)
-                self.time_detect = time.time() - self.time_start
                 self.label_4.setText(str(self.time_detect))  # Has to use a label, editbox just freezes the GUI
+
+            else:
+                break
+        cuda_context.pop()
+
+        cv2.destroyAllWindows()
+        cuda_context.pop()
+
+    def cuda_contextYOLOTiny(self):
+        cuda.init()
+        cuda_context = cuda.Device(0).make_context()
+        pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7TinyVer3.trt')
+
+        options = QFileDialog.Options()
+        options |= QFileDialog.ReadOnly
+
+        while True:
+            fileName, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "",
+                                                      "All Files (*);;Images (*.png *.xpm *.jpg *.bmp *.gif)",
+                                                      options=options)
+            if fileName:
+                image = cv2.imread(fileName)
+                # image = cv2.resize(image, (640, 640))
+                confidence = self.confidence
+                self.time_start = time.time()
+                origin_img = pred.direct_inference(image, conf=0.2)
+                self.time_detect = time.time() - self.time_start
+                center_list = coord_list_to_center_list(pred.coord_list, self.confidence)
+                for center in center_list:
+                    center = (int(center[0]), int(center[1]))
+                    origin_img = cv2.circle(origin_img, center, radius=10, color=(0, 0, 255), thickness=-1)
+                self.set_image(origin_img)
+                self.label_4.setText(str(self.time_detect))  # Has to use a label, editbox just freezes the GUI
+
             else:
                 break
         cuda_context.pop()
         # en:Stop grab image
 
-    def cuda_context3(self):
+    def cuda_contextYOLOSegmentation(self):
         cuda.init()
         cuda_context = cuda.Device(0).make_context()
         opt = parse_opt()

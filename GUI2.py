@@ -170,7 +170,7 @@ class Logic(QMainWindow, Ui_MainWindow):
         pass
 
     def start_grabbing(self):
-        thread = threading.Thread(target=self.cuda_context2)
+        thread = threading.Thread(target=self.cuda_context)
         thread.start()
 
     def cuda_context(self):
