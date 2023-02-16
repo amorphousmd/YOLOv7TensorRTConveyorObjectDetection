@@ -270,7 +270,7 @@ class Logic(QMainWindow, Ui_MainWindow):
     def cuda_contextYOLOTiny(self):
         cuda.init()
         cuda_context = cuda.Device(0).make_context()
-        pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7TinyVer3.trt')
+        pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7TinyVer4.trt')
 
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
@@ -284,7 +284,7 @@ class Logic(QMainWindow, Ui_MainWindow):
                 # image = cv2.resize(image, (640, 640))
                 confidence = self.confidence
                 self.time_start = time.time()
-                origin_img = pred.direct_inference(image, conf=0.2)
+                origin_img = pred.direct_inference(image, conf=confidence)
                 self.time_detect = time.time() - self.time_start
                 center_list = coord_list_to_center_list(pred.coord_list, self.confidence)
                 for center in center_list:
