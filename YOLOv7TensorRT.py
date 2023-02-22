@@ -83,7 +83,6 @@ class BaseEngine(object):
 
     def direct_inference(self, captured_image, conf=0.25):
         origin_img = captured_image
-        origin_img = cv2.cvtColor(origin_img, cv2.COLOR_BGR2RGB)
         img, ratio = preproc(origin_img, self.imgsz, self.mean, self.std)
         num, final_boxes, final_scores, final_cls_inds = self.infer(img)
         # num: number of object detected

@@ -2,6 +2,7 @@ import math
 import tensorrt as trt
 import pycuda.autoinit
 import pycuda.driver as cuda
+
 from Ui_Design import *
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import *
@@ -30,13 +31,17 @@ from YOLOv7TensorRT import _COLORS
 from seg.segment.inferences import SegmentInference, parse_opt
 from YOLOv7TensorRT import BaseEngine
 import YOLOv7TensorRT as yolov7
+from YOLOv7TensorRTv2 import BaseEngineVer2
 import time
+from Haytraochoanh import Yolov7
+
 
 class BaseEngineCracker(BaseEngine):
     def __init__(self, engine_path, imgsz=(640, 640)):
         super().__init__(engine_path, imgsz=(640, 640))
         self.class_names = ['BAD', 'GOOD']
         self.coord_list = []
+
 
     def direct_inference(self, captured_image, conf=0.25):
         self.coord_list = [] # Reset the coord list every time
@@ -78,12 +83,6 @@ class BaseEngineCracker(BaseEngine):
                              conf=conf, class_names=self.class_names)
         origin_img = cv2.cvtColor(origin_img, cv2.COLOR_RGB2BGR)
         return origin_img
-
-# pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7.trt')
-# opt = parse_opt()
-# opt.nosave = True
-# segment_object = SegmentInference()
-# segment_object.start(**vars(opt))
 
 def coord_list_to_center_list(coord_list, confidence):
     centers = []
@@ -138,7 +137,6 @@ class Logic(QMainWindow, Ui_MainWindow):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
         app.aboutToQuit.connect(self.closeEvent)
-
 
     def __init__(self, *args, **kwargs):
         QMainWindow.__init__(self, *args, **kwargs)
@@ -264,13 +262,9 @@ class Logic(QMainWindow, Ui_MainWindow):
                 break
         cuda_context.pop()
 
-        cv2.destroyAllWindows()
-        cuda_context.pop()
 
     def cuda_contextYOLOTiny(self):
-        cuda.init()
-        cuda_context = cuda.Device(0).make_context()
-        pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7TinyVer4.trt')
+        pred2 = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7TinyVer5.trt')
 
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
@@ -281,12 +275,13 @@ class Logic(QMainWindow, Ui_MainWindow):
                                                       options=options)
             if fileName:
                 image = cv2.imread(fileName)
-                # image = cv2.resize(image, (640, 640))
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 confidence = self.confidence
                 self.time_start = time.time()
-                origin_img = pred.direct_inference(image, conf=confidence)
+                origin_img = pred2.direct_inference(image, conf=confidence)
+                origin_img = cv2.cvtColor(origin_img, cv2.COLOR_RGB2BGR)
                 self.time_detect = time.time() - self.time_start
-                center_list = coord_list_to_center_list(pred.coord_list, self.confidence)
+                center_list = coord_list_to_center_list(pred2.coord_list, self.confidence)
                 for center in center_list:
                     center = (int(center[0]), int(center[1]))
                     origin_img = cv2.circle(origin_img, center, radius=10, color=(0, 0, 255), thickness=-1)
@@ -295,8 +290,6 @@ class Logic(QMainWindow, Ui_MainWindow):
 
             else:
                 break
-        cuda_context.pop()
-        # en:Stop grab image
 
     def cuda_contextYOLOSegmentation(self):
         cuda.init()

@@ -24,3 +24,7 @@ seg/runs/predict-seg/
 TestImages/
 
 *.pth
+
+*.jpg
+
+YOLOv7TensorRTv2.py
