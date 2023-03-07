@@ -235,7 +235,7 @@ class Logic(QMainWindow, Ui_MainWindow):
     def cuda_contextYOLO(self):
         cuda.init()
         cuda_context = cuda.Device(0).make_context()
-        pred = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7.trt')
+        pred = BaseEngineCracker(engine_path='./tensorrt-python/Crackers2YOLOv7.trt')
 
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
