@@ -264,7 +264,7 @@ class Logic(QMainWindow, Ui_MainWindow):
 
 
     def cuda_contextYOLOTiny(self):
-        pred2 = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7TinyVer5.trt')
+        pred2 = BaseEngineCracker(engine_path='./tensorrt-python/YOLOv7TinyCandy.trt')
 
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly

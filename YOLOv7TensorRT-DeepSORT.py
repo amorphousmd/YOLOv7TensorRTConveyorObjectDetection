@@ -3,15 +3,17 @@ import pycuda.autoinit
 import pycuda.driver as cuda
 import numpy as np
 import cv2
+import time
 import matplotlib.pyplot as plt
 
-
+global detections
+detections = []
 class BaseEngine(object):
     def __init__(self, engine_path, imgsz=(640, 640)):
         self.imgsz = imgsz
         self.mean = None
         self.std = None
-        self.class_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
+        self.class_names = ['Keo', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
                             'traffic light',
                             'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse',
                             'sheep', 'cow',
@@ -66,7 +68,7 @@ class BaseEngine(object):
         data = [out['host'] for out in self.outputs]
         return data
 
-    def inference(self, img_path, conf=0.25):
+    def inference(self, img_path, conf=0.5):
         origin_img = cv2.imread(img_path)
         origin_img = cv2.cvtColor(origin_img, cv2.COLOR_BGR2RGB)
         img, ratio = preproc(origin_img, self.imgsz, self.mean, self.std)
@@ -81,7 +83,7 @@ class BaseEngine(object):
         origin_img = cv2.cvtColor(origin_img, cv2.COLOR_RGB2BGR)
         return origin_img
 
-    def direct_inference(self, captured_image, conf=0.25):
+    def direct_inference(self, captured_image, conf=0.5):
         origin_img = captured_image
         img, ratio = preproc(origin_img, self.imgsz, self.mean, self.std)
         num, final_boxes, final_scores, final_cls_inds = self.infer(img)
@@ -222,6 +224,8 @@ _COLORS = np.array(
 
 
 def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
+    global detections
+    detections = []
     for i in range(len(boxes)):
         box = boxes[i]
         cls_id = int(cls_ids[i])
@@ -232,26 +236,48 @@ def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
         y0 = int(box[1])
         x1 = int(box[2])
         y1 = int(box[3])
+        detections.append(([x0, y0, int(x1 - x0), int(y1 - y0)], score, 'Keo'))
 
-        color = (_COLORS[cls_id % 80] * 255).astype(np.uint8).tolist()
-        text = '{}:{:.1f}%'.format(class_names[cls_id], score * 100)
-        txt_color = (0, 0, 0) if np.mean(_COLORS[cls_id % 80]) > 0.5 else (255, 255, 255)
-        font = cv2.FONT_HERSHEY_SIMPLEX
-
-        txt_size = cv2.getTextSize(text, font, 0.4, 1)[0]
-        cv2.rectangle(img, (x0, y0), (x1, y1), color, 2)
-
-        txt_bk_color = (_COLORS[cls_id % 80] * 255 * 0.7).astype(np.uint8).tolist()
-        cv2.rectangle(
-            img,
-            (x0, y0 + 1),
-            (x0 + txt_size[0] + 1, y0 + int(1.5 * txt_size[1])),
-            txt_bk_color,
-            -1
-        )
-        cv2.putText(img, text, (x0, y0 + txt_size[1]), font, 0.4, txt_color, thickness=1)
+        # color = (_COLORS[cls_id % 80] * 255).astype(np.uint8).tolist()
+        # text = '{}:{:.1f}%'.format(class_names[cls_id], score * 100)
+        # txt_color = (0, 0, 0) if np.mean(_COLORS[cls_id % 80]) > 0.5 else (255, 255, 255)
+        # font = cv2.FONT_HERSHEY_SIMPLEX
+        #
+        # txt_size = cv2.getTextSize(text, font, 0.4, 1)[0]
+        # cv2.rectangle(img, (x0, y0), (x1, y1), color, 2)
+        #
+        # txt_bk_color = (_COLORS[cls_id % 80] * 255 * 0.7).astype(np.uint8).tolist()
+        # cv2.rectangle(
+        #     img,
+        #     (x0, y0 + 1),
+        #     (x0 + txt_size[0] + 1, y0 + int(1.5 * txt_size[1])),
+        #     txt_bk_color,
+        #     -1
+        # )
+        # cv2.putText(img, text, (x0, y0 + txt_size[1]), font, 0.4, txt_color, thickness=1)
 
     return img
+
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+
+
+from deep_sort_realtime.deepsort_tracker import DeepSort
+
+object_tracker = DeepSort(max_age=40,
+                n_init=2,
+                nms_max_overlap=0.9,
+                max_cosine_distance=0.9,
+                nn_budget=None,
+                override_track_class=None,
+                embedder="mobilenet",
+                half=True,
+                bgr=True,
+                embedder_gpu=True,
+                embedder_model_name=None,
+                embedder_wts=None,
+                polygon=False,
+                today=None)
 
 if __name__ == '__main__':
     pred = BaseEngine(engine_path='./tensorrt-python/YOLOv7TinyCandy.trt')
@@ -264,24 +290,35 @@ if __name__ == '__main__':
         if not ret:
             print("failed to grab frame")
             break
+        start = time.perf_counter()
         origin_img = pred.direct_inference(frame)
-        cv2.imshow('Window', origin_img)
+        tracks = object_tracker.update_tracks(detections,
+                                              frame=origin_img)  # bbs expected to be a list of detections, each in tuples of ( [left,top,w,h], confidence, detection_class )
 
-        k = cv2.waitKey(1)
-        if k % 256 == 27:
-            # ESC pressed
-            print("Escape hit, closing...")
+        for track in tracks:
+            if not track.is_confirmed():
+                continue
+            track_id = track.track_id
+            ltrb = track.to_ltrb()
+
+            bbox = ltrb
+
+            cv2.rectangle(origin_img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0, 0, 255), 2)
+            cv2.putText(origin_img, "ID: " + str(track_id), (int(bbox[0]), int(bbox[1] - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                        (0, 255, 0), 2)
+
+        end = time.perf_counter()
+        totalTime = end - start
+        fps = 1 / totalTime
+
+        cv2.putText(origin_img, f'FPS: {int(fps)}', (20, 70), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
+        origin_img = cv2.resize(origin_img, (1280, 720))
+        origin_img = cv2.cvtColor(origin_img, cv2.COLOR_RGB2BGR)
+        cv2.imshow('img', origin_img)
+
+        if cv2.waitKey(1) & 0xFF == 27:
             break
 
     cam.release()
 
     cv2.destroyAllWindows()
-
-
-
-    # pred = BaseEngine(engine_path='./tensorrt-python/yolov7-tiny-nms.trt')
-    # origin_img = pred.inference('./yolov7/inference/images/horses.jpg')
-    # print(np.shape(origin_img))
-    # cv2.imshow('Window', origin_img)
-    # cv2.waitKey(0)
-    # pred.get_fps()
